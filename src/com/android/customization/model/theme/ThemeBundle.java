@@ -17,6 +17,7 @@ package com.android.customization.model.theme;
 
 import android.content.Context;
 import android.content.res.ColorStateList;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -30,41 +31,47 @@ import android.widget.TextView;
 import androidx.annotation.ColorInt;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 import androidx.core.graphics.PathParser;
 
+import com.android.customization.model.CustomizationManager;
 import com.android.customization.model.CustomizationOption;
 import com.android.wallpaper.R;
+import com.android.wallpaper.asset.Asset;
 import com.android.wallpaper.asset.ResourceAsset;
+import com.android.wallpaper.model.WallpaperInfo;
+
+import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents a Theme component available in the system as a "persona" bundle.
  * Note that in this context a Theme is not related to Android's Styles, but it's rather an
  * abstraction representing a series of overlays to be applied to the system.
  */
-public class ThemeBundle implements CustomizationOption {
+public class ThemeBundle implements CustomizationOption<ThemeBundle> {
 
     private final String mTitle;
     private final PreviewInfo mPreviewInfo;
-    private final String mFontOverlayPackage;
-    private final String mColorOverlayPackage;
-    private final String mShapeOverlayPackage;
-    private final List<String> mIconOverlayPackages;
     private final boolean mIsDefault;
+    private final Map<String, String> mPackagesByCategory;
+    @Nullable private final WallpaperInfo mWallpaperInfo;
+    private WallpaperInfo mOverrideWallpaper;
 
-    private ThemeBundle(String title, @Nullable String fontOverlayPackage,
-            @Nullable String colorOverlayPackage, @Nullable String shapeOverlayPackage,
-            List<String> iconOverlayPackages, boolean isDefault, PreviewInfo previewInfo) {
+    private ThemeBundle(String title, Map<String, String> overlayPackages,
+            boolean isDefault, @Nullable WallpaperInfo wallpaperInfo,
+            PreviewInfo previewInfo) {
         mTitle = title;
-        mFontOverlayPackage = fontOverlayPackage;
-        mColorOverlayPackage = colorOverlayPackage;
-        mShapeOverlayPackage = shapeOverlayPackage;
-        mIconOverlayPackages = Collections.unmodifiableList(iconOverlayPackages);
         mIsDefault = isDefault;
         mPreviewInfo = previewInfo;
+        mWallpaperInfo = wallpaperInfo;
+        mPackagesByCategory = Collections.unmodifiableMap(overlayPackages);        
     }
 
     @Override
@@ -95,8 +102,16 @@ public class ThemeBundle implements CustomizationOption {
     }
 
     @Override
-    public boolean isActive(Context context) {
-        return false;
+    public boolean isActive(CustomizationManager<ThemeBundle> manager) {
+        ThemeManager themeManager = (ThemeManager) manager;
+        String serializedOverlays = themeManager.getStoredOverlays();
+
+        if (mIsDefault) {
+            return TextUtils.isEmpty(serializedOverlays);
+        } else {
+            Map<String, String> currentOverlays = themeManager.getCurrentOverlays();
+            return mPackagesByCategory.equals(currentOverlays);
+        }
     }
 
     @Override
@@ -108,25 +123,40 @@ public class ThemeBundle implements CustomizationOption {
         return mPreviewInfo;
     }
 
-    String getFontOverlayPackage() {
-        return mFontOverlayPackage;
+    public void setOverrideThemeWallpaper(WallpaperInfo homeWallpaper) {
+        mOverrideWallpaper = homeWallpaper;
     }
 
-    String getColorOverlayPackage() {
-        return mColorOverlayPackage;
+    public boolean useThemeWallpaper() {
+        return mOverrideWallpaper == null && mWallpaperInfo != null;
     }
 
-    String getShapeOverlayPackage() {
-        return mShapeOverlayPackage;
+    public Asset getWallpaperPreviewAsset(Context context) {
+        return mOverrideWallpaper != null ?
+                mOverrideWallpaper.getThumbAsset(context) :
+                getPreviewInfo().wallpaperAsset;
     }
 
-    List<String> getIconOverlayPackages() {
-        return mIconOverlayPackages;
+    public WallpaperInfo getWallpaperInfo() {
+        return mWallpaperInfo;
     }
 
     boolean isDefault() {
         return mIsDefault;
     }
+
+    Collection<String> getAllPackages() {
+        return mPackagesByCategory.values();
+    }
+
+    public String getSerializedPackages() {
+        if (isDefault()) {
+            return "";
+        }
+
+        return new JSONObject(mPackagesByCategory).toString();
+    }
+
 
     public static class PreviewInfo {
         public final Typeface bodyFontFamily;
@@ -135,23 +165,35 @@ public class ThemeBundle implements CustomizationOption {
         @ColorInt public final int colorAccentDark;
         public final List<Drawable> icons;
         public final Drawable shapeDrawable;
-        @DrawableRes public final int wallpaperDrawableRes;
-        public final ResourceAsset colorPreviewDrawable;
-        public final ResourceAsset shapePreviewDrawable;
+        @Nullable public final ResourceAsset wallpaperAsset;
+        @Nullable public final ResourceAsset colorPreviewAsset;
+        @Nullable public final ResourceAsset shapePreviewAsset;
 
         private PreviewInfo(Typeface bodyFontFamily, Typeface headlineFontFamily,
                 int colorAccentLight, int colorAccentDark, List<Drawable> icons,
-                Drawable shapeDrawable, int wallpaperDrawableRes,
-                ResourceAsset colorPreviewDrawable, ResourceAsset shapePreviewDrawable) {
+                Drawable shapeDrawable, @Nullable ResourceAsset wallpaperAsset,
+                @Nullable ResourceAsset colorPreviewAsset,
+                @Nullable ResourceAsset shapePreviewAsset) {
             this.bodyFontFamily = bodyFontFamily;
             this.headlineFontFamily = headlineFontFamily;
             this.colorAccentLight = colorAccentLight;
             this.colorAccentDark = colorAccentDark;
             this.icons = icons;
             this.shapeDrawable = shapeDrawable;
-            this.wallpaperDrawableRes = wallpaperDrawableRes;
-            this.colorPreviewDrawable = colorPreviewDrawable;
-            this.shapePreviewDrawable = shapePreviewDrawable;
+            this.wallpaperAsset = wallpaperAsset;
+            this.colorPreviewAsset = colorPreviewAsset;
+            this.shapePreviewAsset = shapePreviewAsset;
+        }
+
+        /**
+         * Returns the accent color to be applied corresponding with the current configuration's
+         * UI mode.
+         * @return one of {@link #colorAccentDark} or {@link #colorAccentLight}
+         */
+        @ColorInt
+        public int resolveAccentColor(Resources res) {
+            return (res.getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                    == Configuration.UI_MODE_NIGHT_YES ? colorAccentDark : colorAccentLight;
         }
     }
 
@@ -165,14 +207,11 @@ public class ThemeBundle implements CustomizationOption {
         private List<Drawable> mIcons = new ArrayList<>();
         private String mShapePath;
         private boolean mIsDefault;
-        @DrawableRes private int mWallpaperDrawableResId;
+        private ResourceAsset mWallpaperAsset;
         private ResourceAsset mColorPreview;
         private ResourceAsset mShapePreview;
-
-        private String mFontOverlayPackage;
-        private String mColorsPackage;
-        private List<String> mIconPackages = new ArrayList<>();
-        private String mShapePackage;
+        private WallpaperInfo mWallpaperInfo;
+        private Map<String, String> mPackages = new HashMap<>();
 
         public ThemeBundle build() {
             ShapeDrawable shapeDrawable = null;
@@ -183,20 +222,14 @@ public class ThemeBundle implements CustomizationOption {
                 shapeDrawable.setIntrinsicHeight((int) PATH_SIZE);
                 shapeDrawable.setIntrinsicWidth((int) PATH_SIZE);
             }
-            return new ThemeBundle(mTitle, mFontOverlayPackage, mColorsPackage, mShapePackage,
-                    mIconPackages, mIsDefault,
+            return new ThemeBundle(mTitle, mPackages, mIsDefault, mWallpaperInfo,
                     new PreviewInfo(mBodyFontFamily, mHeadlineFontFamily, mColorAccentLight,
-                            mColorAccentDark, mIcons, shapeDrawable, mWallpaperDrawableResId,
+                            mColorAccentDark, mIcons, shapeDrawable, mWallpaperAsset,
                             mColorPreview, mShapePreview));
         }
 
         public Builder setTitle(String title) {
             mTitle = title;
-            return this;
-        }
-
-        public Builder setFontOverlayPackage(String packageName) {
-            mFontOverlayPackage = packageName;
             return this;
         }
 
@@ -207,11 +240,6 @@ public class ThemeBundle implements CustomizationOption {
 
         public Builder setHeadlineFontFamily(@Nullable Typeface headlineFontFamily) {
             mHeadlineFontFamily = headlineFontFamily;
-            return this;
-        }
-
-        public Builder setColorPackage(String packageName) {
-            mColorsPackage = packageName;
             return this;
         }
 
@@ -230,13 +258,8 @@ public class ThemeBundle implements CustomizationOption {
             return this;
         }
 
-        public Builder addIconPackage(String packageName) {
-            mIconPackages.add(packageName);
-            return this;
-        }
-
-        public Builder setShapePackage(String packageName) {
-            mShapePackage = packageName;
+        public Builder addOverlayPackage(String category, String packageName) {
+            mPackages.put(category, packageName);
             return this;
         }
 
@@ -252,6 +275,19 @@ public class ThemeBundle implements CustomizationOption {
 
         public Builder setShapePreview(ResourceAsset shapePreview) {
             mShapePreview = shapePreview;
+            return this;
+        }
+
+        public Builder setWallpaperInfo(String wallpaperPackageName, String wallpaperResName,
+                String themeId, @DrawableRes int wallpaperResId, @StringRes int titleResId,
+                @StringRes int attributionResId, @StringRes int actionUrlResId) {
+            mWallpaperInfo = new ThemeBundledWallpaperInfo(wallpaperPackageName, wallpaperResName,
+                    themeId, wallpaperResId, titleResId, attributionResId, actionUrlResId);
+            return this;
+        }
+
+        public Builder setWallpaperAsset(ResourceAsset wallpaperAsset) {
+            mWallpaperAsset = wallpaperAsset;
             return this;
         }
 

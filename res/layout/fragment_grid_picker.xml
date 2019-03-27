@@ -17,9 +17,9 @@
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
+    android:layout_height="match_parent" xmlns:app="http://schemas.android.com/apk/res-auto"
     android:orientation="vertical"
-    android:background="@color/category_picker_background_color">
+    android:background="?android:colorPrimary">
     <include layout="@layout/section_header"/>
 
     <com.android.customization.widget.PreviewPager
@@ -27,7 +27,8 @@
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:background="@color/secondary_color"/>
+        android:background="@color/secondary_color"
+        app:card_style="screen_aspect_ratio"/>
 
     <LinearLayout
         android:id="@+id/options_section"

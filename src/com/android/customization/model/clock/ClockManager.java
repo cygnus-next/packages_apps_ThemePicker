@@ -16,12 +16,14 @@
 package com.android.customization.model.clock;
 
 import android.content.Context;
-import android.provider.Settings;
+import android.provider.Settings.Secure;
 
 import com.android.customization.model.CustomizationManager;
 
 public class ClockManager implements CustomizationManager<Clockface> {
 
+    // TODO: use constant from Settings.Secure
+    private static final String CLOCK_FACE_SETTING = "lock_screen_custom_clock_face";
     private final ClockProvider mClockProvider;
     private final Context mContext;
 
@@ -36,13 +38,22 @@ public class ClockManager implements CustomizationManager<Clockface> {
     }
 
     @Override
-    public void apply(Clockface option) {
-        Settings.Secure.putString(mContext.getContentResolver(),
-                Clockface.CLOCK_FACE_SETTING, option.getId());
+    public void apply(Clockface option, Callback callback) {
+        boolean stored = Secure.putString(mContext.getContentResolver(),
+                CLOCK_FACE_SETTING, option.getId());
+        if (stored) {
+            callback.onSuccess();
+        } else {
+            callback.onError(null);
+        }
     }
 
     @Override
     public void fetchOptions(OptionsFetchedListener<Clockface> callback) {
         mClockProvider.fetch(callback, false);
+    }
+
+    public String getCurrentClock() {
+        return Secure.getString(mContext.getContentResolver(), CLOCK_FACE_SETTING);
     }
 }
