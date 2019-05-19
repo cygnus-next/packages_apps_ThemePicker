@@ -15,6 +15,15 @@
  */
 package com.android.customization.model;
 
+import android.content.Context;
+import android.content.res.Resources;
+import android.provider.Settings.Secure;
+
+import com.android.wallpaper.R;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+
 /**
  * Holds common strings used to reference system resources.
  */
@@ -40,4 +49,65 @@ public interface ResourceConstants {
      */
     String CONFIG_ICON_MASK = "config_icon_mask";
 
+    /**
+     * Name of the system resource for dialog corner radius
+     */
+    String CONFIG_CORNERRADIUS = "config_bottomDialogCornerRadius";
+
+    /**
+     * Overlay Categories that theme picker handles.
+     */
+    String OVERLAY_CATEGORY_COLOR = "android.theme.customization.accent_color";
+    String OVERLAY_CATEGORY_FONT = "android.theme.customization.font";
+    String OVERLAY_CATEGORY_SHAPE = "android.theme.customization.adaptive_icon_shape";
+    String OVERLAY_CATEGORY_ICON_ANDROID = "android.theme.customization.icon_pack.android";
+    String OVERLAY_CATEGORY_ICON_SETTINGS = "android.theme.customization.icon_pack.settings";
+    String OVERLAY_CATEGORY_ICON_SYSUI = "android.theme.customization.icon_pack.systemui";
+    String OVERLAY_CATEGORY_ICON_LAUNCHER = "android.theme.customization.icon_pack.launcher";
+
+    /**
+     * Global Android theme category (default theme prebundled with the OS)
+     */
+    String OVERLAY_CATEGORY_ANDROID_THEME = "android.theme";
+
+    /**
+     * Secure Setting used to store the currently set theme.
+     */
+    String THEME_SETTING = Secure.THEME_CUSTOMIZATION_OVERLAY_PACKAGES;
+    String CONFIG_BODY_FONT_FAMILY = "config_bodyFontFamily";
+    String CONFIG_HEADLINE_FONT_FAMILY = "config_headlineFontFamily";
+    String[] ICONS_FOR_PREVIEW = {
+            "ic_wifi_signal_3",
+            "ic_qs_bluetooth",
+            "ic_qs_dnd",
+            "ic_qs_flashlight",
+            "ic_qs_auto_rotate",
+            "ic_qs_airplane"
+    };
+
+    ArrayList<String> sTargetPackages = new ArrayList<>();
+    String ACCENT_COLOR_LIGHT_NAME = "accent_device_default_light";
+    String ACCENT_COLOR_DARK_NAME = "accent_device_default_dark";
+
+    float PATH_SIZE = 100f;
+
+    static String[] getPackagesToOverlay(Context context) {
+        if (sTargetPackages.isEmpty()) {
+            sTargetPackages.addAll(Arrays.asList(ANDROID_PACKAGE, SETTINGS_PACKAGE,
+                    SYSUI_PACKAGE));
+            sTargetPackages.add(getLauncherPackage(context));
+        }
+        return sTargetPackages.toArray(new String[0]);
+    }
+
+    static String getLauncherPackage(Context context) {
+        return context.getString(R.string.launcher_overlayable_package);
+    }
+
+    /**
+     * @return the value CONFIG_ICON_MASK for the given package name using the given Resources
+     */
+    static String getIconMask(Resources res, String packageName) {
+        return res.getString(res.getIdentifier(CONFIG_ICON_MASK, "string", packageName));
+    }
 }

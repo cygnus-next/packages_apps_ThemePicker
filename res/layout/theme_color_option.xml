@@ -14,12 +14,16 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<ImageView
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:id="@+id/preview_static_image"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:layout_gravity="center"
-    android:scaleType="centerInside"
-    tools:showIn="@layout/theme_preview_card"/>
+    android:layout_height="match_parent"
+    android:layout_marginHorizontal="6dp"
+    android:paddingHorizontal="4dp">
+
+    <ImageView
+        android:id="@+id/option_tile"
+        android:layout_width="@dimen/component_color_chip_size"
+        android:layout_height="@dimen/component_color_chip_size"
+        android:layout_gravity="center"
+        android:src="@drawable/color_chip"/>
+</FrameLayout>

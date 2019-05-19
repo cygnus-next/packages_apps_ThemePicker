@@ -16,6 +16,9 @@
 package com.android.customization.widget;
 
 import android.content.res.Resources;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -37,9 +40,10 @@ import java.util.Set;
  * Simple controller for a RecyclerView-based widget to hold the options for each customization
  * section (eg, thumbnails for themes, clocks, grid sizes).
  * To use, just pass the RV that will contain the tiles and the list of {@link CustomizationOption}
- * representing each option, and call {@link #initOptions()} to populate the widget.
+ * representing each option, and call {@link #initOptions(CustomizationManager)} to populate the
+ * widget.
  */
-public class OptionSelectorController {
+public class OptionSelectorController<T extends CustomizationOption<T>> {
 
     /**
      * Interface to be notified when an option is selected by the user.
@@ -52,14 +56,14 @@ public class OptionSelectorController {
     }
 
     private final RecyclerView mContainer;
-    private final List<? extends CustomizationOption> mOptions;
+    private final List<T> mOptions;
 
     private final Set<OptionSelectedListener> mListeners = new HashSet<>();
     private RecyclerView.Adapter<TileViewHolder> mAdapter;
     private CustomizationOption mSelectedOption;
+    private CustomizationOption mAppliedOption;
 
-    public OptionSelectorController(RecyclerView container,
-            List<? extends CustomizationOption> options) {
+    public OptionSelectorController(RecyclerView container, List<T> options) {
         mContainer = container;
         mOptions = options;
     }
@@ -76,15 +80,39 @@ public class OptionSelectorController {
         if (!mOptions.contains(option)) {
             throw new IllegalArgumentException("Invalid option");
         }
+        updateActivatedStatus(mSelectedOption, false);
+        updateActivatedStatus(option, true);
         mSelectedOption = option;
-        mAdapter.notifyDataSetChanged();
         notifyListeners();
+    }
+
+    /**
+     * Mark an option as the one which is currently applied on the device. This will result in a
+     * check being displayed in the lower-right corner of the corresponding ViewHolder.
+     * @param option
+     */
+    public void setAppliedOption(CustomizationOption option) {
+        if (!mOptions.contains(option)) {
+            throw new IllegalArgumentException("Invalid option");
+        }
+        mAppliedOption = option;
+    }
+
+    private void updateActivatedStatus(CustomizationOption option, boolean isActivated) {
+        int index = mOptions.indexOf(option);
+        if (index < 0) {
+            return;
+        }
+        RecyclerView.ViewHolder holder = mContainer.findViewHolderForAdapterPosition(index);
+        if (holder != null && holder.itemView != null) {
+            holder.itemView.setActivated(isActivated);
+        }
     }
 
     /**
      * Initializes the UI for the options passed in the constructor of this class.
      */
-    public void initOptions(final CustomizationManager<? extends CustomizationOption> manager) {
+    public void initOptions(final CustomizationManager<T> manager) {
         mAdapter = new RecyclerView.Adapter<TileViewHolder>() {
             @Override
             public int getItemViewType(int position) {
@@ -103,6 +131,7 @@ public class OptionSelectorController {
                 CustomizationOption option = mOptions.get(position);
                 if (mSelectedOption == null && option.isActive(manager)) {
                     mSelectedOption = option;
+                    mAppliedOption = option;
                 }
                 if (holder.labelView != null) {
                     holder.labelView.setText(option.getTitle());
@@ -110,6 +139,27 @@ public class OptionSelectorController {
                 option.bindThumbnailTile(holder.tileView);
                 holder.itemView.setActivated(option.equals(mSelectedOption));
                 holder.itemView.setOnClickListener(view -> setSelectedOption(option));
+
+                if (option.equals(mAppliedOption)) {
+                    Resources res = mContainer.getContext().getResources();
+                    Drawable checkmark = res.getDrawable(R.drawable.ic_check_circle_filled_24px);
+                    Drawable frame = holder.itemView.getForeground();
+                    Drawable[] layers = {frame, checkmark};
+                    if (frame == null) {
+                        layers = new Drawable[]{checkmark};
+                    }
+                    LayerDrawable checkedFrame = new LayerDrawable(layers);
+
+                    // Position at lower right
+                    int idx = layers.length - 1;
+                    int checkSize = (int) res.getDimension(R.dimen.check_size);
+                    checkedFrame.setLayerGravity(idx, Gravity.BOTTOM | Gravity.RIGHT);
+                    checkedFrame.setLayerWidth(idx, checkSize);
+                    checkedFrame.setLayerHeight(idx, checkSize);
+                    checkedFrame.setLayerInsetBottom(idx, checkSize/2);
+                    checkedFrame.setLayerInsetLeft(idx, checkSize/2);
+                    holder.itemView.setForeground(checkedFrame);
+                }
             }
 
             @Override
@@ -122,8 +172,15 @@ public class OptionSelectorController {
                 LinearLayoutManager.HORIZONTAL, false));
         Resources res = mContainer.getContext().getResources();
         mContainer.addItemDecoration(new HorizontalSpacerItemDecoration(
-                res.getDimensionPixelOffset(R.dimen.option_tile_margin_horizontal)));
+                res.getDimensionPixelOffset(R.dimen.option_tile_margin_horizontal),
+                res.getDimensionPixelOffset(R.dimen.option_tile_margin_horizontal_ends)));
         mContainer.setAdapter(mAdapter);
+    }
+
+    public void resetOptions(List<T> options) {
+        mOptions.clear();
+        mOptions.addAll(options);
+        mAdapter.notifyDataSetChanged();
     }
 
     private void notifyListeners() {

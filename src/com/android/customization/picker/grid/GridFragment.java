@@ -36,6 +36,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.android.customization.model.CustomizationManager.Callback;
 import com.android.customization.model.grid.GridOption;
 import com.android.customization.model.grid.GridOptionsManager;
+import com.android.customization.module.ThemesUserEventLogger;
 import com.android.customization.picker.BasePreviewAdapter;
 import com.android.customization.picker.BasePreviewAdapter.PreviewPage;
 import com.android.customization.widget.OptionSelectorController;
@@ -77,15 +78,18 @@ public class GridFragment extends ToolbarFragment {
     private BitmapDrawable mCardBackground;
     private GridPreviewAdapter mAdapter;
     private RecyclerView mOptionsContainer;
-    private OptionSelectorController mOptionsController;
+    private OptionSelectorController<GridOption> mOptionsController;
     private GridOptionsManager mGridManager;
     private GridOption mSelectedOption;
     private PreviewPager mPreviewPager;
+    private ThemesUserEventLogger mEventLogger;
 
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
         mGridManager = ((GridFragmentHost) context).getGridOptionsManager();
+        mEventLogger = (ThemesUserEventLogger)
+                InjectorProvider.getInjector().getUserEventLogger(context);
     }
 
     @Nullable
@@ -158,10 +162,11 @@ public class GridFragment extends ToolbarFragment {
 
     private void setUpOptions() {
         mGridManager.fetchOptions(options -> {
-            mOptionsController = new OptionSelectorController(mOptionsContainer, options);
+            mOptionsController = new OptionSelectorController<>(mOptionsContainer, options);
 
             mOptionsController.addListener(selected -> {
                 mSelectedOption = (GridOption) selected;
+                mEventLogger.logGridSelected(mSelectedOption);
                 createAdapter();
             });
             mOptionsController.initOptions(mGridManager);
@@ -175,7 +180,7 @@ public class GridFragment extends ToolbarFragment {
                 mSelectedOption = options.get(0);
             }
             createAdapter();
-        });
+        }, false);
     }
 
     private class GridPreviewPage extends PreviewPage {
